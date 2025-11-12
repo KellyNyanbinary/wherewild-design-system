@@ -19,6 +19,8 @@ Whether you’re looking to use SDS to start a new project, or are looking for e
 - `npm run app:dev` will run server at [localhost:8000](http://localhost:8000) which renders contents of [App.tsx](src/App.tsx)
 - `npm run storybook` to start storybook at [localhost:6006](http://localhost:6006)
 
+For running local plugins on Figma, the local Figma app is required.
+
 ### Figma Auth
 
 - [Create a Figma API token](https://www.figma.com/developers/api#authentication)
@@ -60,6 +62,17 @@ With the above in mind, a fresh clone of the Simple Design System Figma file sho
   - Note: the file keys (eg. `J0KLPKXiONDRssXD1AX9Oi`) should be the only change in the urls unless you're creating new components, detaching and recreating.
 - Create and set your [Figma Auth Token](#figma-auth)
 - At that point, `npx figma connect publish` should work and your new file should have Code Connect.
+
+## What you get out of the box
+
+| Capability | Status | Notes |
+| --- | --- | --- |
+| React component library + Storybook | ✅ | `npm run app:dev` and `npm run storybook` are fully supported. |
+| Theme tokens generated from Figma Variables | ✅ | Works via REST (`npm run script:tokens:rest`) or offline JSON (`npm run script:tokens`). |
+| Code Connect docs | ⚠️ Optional | Requires Figma’s Code Connect entitlement (Org/Enterprise). If your plan doesn’t include it, you can skip publishing. |
+| Variables REST API | ⚠️ Plan dependent | Starter/Professional/Education plans can’t access the API. Use the provided plugins instead (see below). |
+
+Even without the premium Figma features you can still keep colors/typography in sync: export the data with the helper plugins, drop the JSON into this repo, regenerate `src/theme.css`, and Storybook will immediately reflect the new palette.
 
 ## Structure
 
@@ -137,3 +150,17 @@ Some example integrations are available in `scripts` directory. They may require
   - [Install plugins](https://www.figma.com/plugin-docs/plugin-quickstart-guide/) in Development
   - Run plugins, and copy plugin outputs into [scripts/tokens/styles.json](./scripts/tokens/styles.json) and [scripts/tokens/tokens.json](./scripts/tokens/tokens.json)
   - Run `npm run script:tokens` (without `:rest`) and it will reference the JSON files directly without making a REST API request to update them
+
+### Keeping tokens/styles in sync without REST access
+
+If your Figma plan doesn’t expose the Variables REST API (Starter/Professional/Education), follow this flow instead:
+
+1. **Export Variables and Styles from Figma**
+   - Install the dev plugins located in `scripts/tokens/figma-plugin-token-json` and `scripts/tokens/figma-plugin-styles-json` via **Plugins → Development → Import plugin from manifest…**.
+   - Run each plugin inside your duplicated SDS Figma file. It will pop a textarea containing JSON.
+   - Copy the Variable output into `scripts/tokens/tokens.json` and the Style output into `scripts/tokens/styles.json`.
+2. **Regenerate the local theme**
+   - Run `npm run script:tokens`. This reads the JSON files, rebuilds `src/theme.css`, and updates `scripts/tokens/tokenVariableSyntaxAndDescriptionSnippet.js`.
+   - Restart Storybook (or your dev server) so it picks up the regenerated CSS.
+
+Whenever you tweak colors/typography in Figma, just repeat the export + `npm run script:tokens` step. If you later gain REST access, switch back to `npm run script:tokens:rest`—the CLI now understands both `com.figma.sds` and `org.sds` namespaces, so no extra changes are required.

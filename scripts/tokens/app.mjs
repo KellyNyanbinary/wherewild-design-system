@@ -11,7 +11,8 @@ const WRITE_DIR = "../../src";
 
 const CONVERT_TO_REM = true;
 // Extension namespace for the w3c token file
-const NAMESPACE = "com.figma.sds";
+const NAMESPACES = ["com.figma.sds", "org.sds"];
+const DEFAULT_NAMESPACE = NAMESPACES[0];
 // Prefix for CSS custom properties
 const TOKEN_PREFIX = "sds-";
 
@@ -86,7 +87,7 @@ async function initialize() {
   if (!SKIP_REST_API) {
     const stylesJSON = await getFileStyles(FILE_KEY);
     fs.writeFileSync("./styles.json", JSON.stringify(stylesJSON, null, 2));
-    const tokensJSON = await getFileVariables(FILE_KEY, NAMESPACE);
+    const tokensJSON = await getFileVariables(FILE_KEY, DEFAULT_NAMESPACE);
     fs.writeFileSync("./tokens.json", JSON.stringify(tokensJSON, null, 2));
   }
   // Process token JSON into CSS
@@ -94,9 +95,12 @@ async function initialize() {
     JSON.parse(fs.readFileSync("./tokens.json")),
   );
   // An object to lookup variables in when processing styles.
-  console.log(processed.color.definitions.sds_light);
   const variableLookups = Object.keys(processed)
-    .flatMap((key) => Object.values(processed[key].definitions)[0])
+    .flatMap((key) =>
+      Object.values(processed[key].definitions).flatMap(
+        (definition) => definition,
+      ),
+    )
     .reduce((into, item) => {
       into[item.figmaId] = item;
       return into;
@@ -322,10 +326,12 @@ ${Object.keys(processed)
       propertyNameFull.charAt(0).toLowerCase() + propertyNameFull.slice(1);
     const type = object.$type || currentType;
     if ("$value" in object) {
-      if ("$extensions" in object && NAMESPACE in object.$extensions) {
+      const extensionData =
+        "$extensions" in object ? getNamespaceData(object.$extensions) : null;
+      if (extensionData && extensionData.modes) {
         const description = object.$description || "";
-        const figmaId = object.$extensions[NAMESPACE].figmaId;
-        for (let mode in object.$extensions[NAMESPACE].modes) {
+        const figmaId = extensionData.figmaId;
+        for (let mode in extensionData.modes) {
           definitions[mode] = definitions[mode] || [];
           definitions[mode].push({
             property,
@@ -335,7 +341,7 @@ ${Object.keys(processed)
             value: valueWithReplacements(
               valueToCSS(
                 property,
-                object.$extensions[NAMESPACE].modes[mode],
+                extensionData.modes[mode],
                 definitionsKey,
                 convertPixelToRem,
                 prefix,
@@ -346,10 +352,7 @@ ${Object.keys(processed)
         }
       } else {
         const description = object.$description || "";
-        const figmaId =
-          "$extensions" in object && NAMESPACE in object.$extensions
-            ? object.$extensions[NAMESPACE].figmaId
-            : "UNDEFINED";
+        const figmaId = extensionData ? extensionData.figmaId : "UNDEFINED";
         const mode = "default";
         definitions[mode] = definitions[mode] || [];
         definitions[mode].push({
@@ -438,21 +441,56 @@ ${Object.keys(processed)
 async function processStyleJSON(data, variablesLookup) {
   const effectDefs = [];
   const text = [];
+  const variableLookupValues = Object.values(variablesLookup || {});
   data.forEach(({ type, ...style }) => {
     if (type === "TEXT") {
       const {
         name,
-        fontSize,
-        fontFamily,
-        fontWeight,
-        fontStyle = "normal",
+        fontSize: styleFontSize,
+        fontFamily: styleFontFamily,
+        fontWeight: styleFontWeight,
+        fontStyle: styleFontStyle = "normal",
+        fontName = {},
+        boundVariables = {},
       } = style;
 
+      const {
+        fontStyle,
+        fontWeight,
+        fontFamily,
+        fontSizeValue,
+      } = deriveFontParts(fontName, styleFontSize, {
+        fontFamily: styleFontFamily,
+        fontWeight: styleFontWeight,
+        fontStyle: styleFontStyle,
+        fontSize: styleFontSize,
+      });
+
       const css = [
-        valueFromPossibleVariable(fontStyle),
-        valueFromPossibleVariable(fontWeight),
-        valueFromPossibleVariable(fontSize),
-        valueFromPossibleVariable(fontFamily),
+        boundVariables.fontStyle
+          ? valueFromPossibleVariable(
+              boundVariables.fontStyle,
+              fontStyle,
+            )
+          : fontStyle,
+        boundVariables.fontWeight
+          ? valueFromPossibleVariable(
+              boundVariables.fontWeight,
+              fontWeight,
+            )
+          : fontWeight,
+        boundVariables.fontSize
+          ? valueFromPossibleVariable(
+              boundVariables.fontSize,
+              fontSizeValue,
+            )
+          : fontSizeValue,
+        boundVariables.fontFamily
+          ? valueFromPossibleVariable(
+              boundVariables.fontFamily,
+              fontFamily,
+            )
+          : fontFamily,
       ].join(" ");
       text.push(
         `--${TOKEN_PREFIX}font-${name
@@ -509,18 +547,23 @@ async function processStyleJSON(data, variablesLookup) {
    * @param {string} item
    * @returns {string}
    */
-  function valueFromPossibleVariable(item = "") {
-    if (typeof item === "object") {
+  function valueFromPossibleVariable(item = "", fallback = "") {
+    if (item && typeof item === "object") {
       // attempting to find bound variables
       const variable = variablesLookup[item.id];
-      return variable ? `var(${variable.property})` : JSON.stringify(item);
-    } else if (item.match(/^[1-9]00$/)) {
+      return variable ? `var(${variable.property})` : fallback;
+    }
+    const stringItem =
+      typeof item === "string" ? item : item !== undefined ? `${item}` : "";
+    if (stringItem.match(/^[1-9]00$/)) {
       // attempting to find variable for weights
       // the scenario where style is used so weight is int
-      const variable = variablesLookup.find(({ value }) => value === item);
-      return variable ? `var(${variable.property})` : item;
+      const variable = variableLookupValues.find(
+        ({ value }) => value === stringItem,
+      );
+      return variable ? `var(${variable.property})` : stringItem;
     }
-    return item;
+    return stringItem || fallback;
   }
 
   /**
@@ -542,35 +585,121 @@ async function processStyleJSON(data, variablesLookup) {
    * @returns {string}
    */
   function formatEffect({ type, ...effect }) {
+    const boundVariables = effect.boundVariables || {};
     if (type === "DROP_SHADOW" || type === "INNER_SHADOW") {
       const {
         radius,
         offset: { x, y },
         spread,
         hex,
-        boundVariables,
       } = effect;
       const numbers = [
         boundVariables.offsetX
-          ? valueFromPossibleVariable(boundVariables.offsetX)
+          ? valueFromPossibleVariable(boundVariables.offsetX, `${x}px`)
           : `${x}px`,
         boundVariables.offsetY
-          ? valueFromPossibleVariable(boundVariables.offsetY)
+          ? valueFromPossibleVariable(boundVariables.offsetY, `${y}px`)
           : `${y}px`,
         boundVariables.radius
-          ? valueFromPossibleVariable(boundVariables.radius)
+          ? valueFromPossibleVariable(boundVariables.radius, `${radius}px`)
           : `${radius}px`,
         boundVariables.spread
-          ? valueFromPossibleVariable(boundVariables.spread)
+          ? valueFromPossibleVariable(boundVariables.spread, `${spread}px`)
           : `${spread}px`,
         boundVariables.color
-          ? valueFromPossibleVariable(boundVariables.color)
-          : `${hex}px`,
+          ? valueFromPossibleVariable(boundVariables.color, hex)
+          : hex,
       ];
       return `${type === "INNER_SHADOW" ? "inset " : ""}${numbers.join(" ")}`;
     } else if (type === "LAYER_BLUR" || type === "BACKGROUND_BLUR") {
-      const { radius, boundVariables } = effect;
-      return `blur(${boundVariables.radius ? valueFromPossibleVariable(boundVariables.radius) : `${radius}px`})`;
+      const { radius } = effect;
+      return `blur(${boundVariables.radius ? valueFromPossibleVariable(boundVariables.radius, `${radius}px`) : `${radius}px`})`;
     }
   }
+}
+
+function deriveFontParts(fontName = {}, fontSize, fallback = {}) {
+  const { family = "", style = "" } = fontName;
+  const resolvedFamily = family || fallback.fontFamily || "";
+  const styleDescriptor =
+    style ||
+    [fallback.fontStyle, fallback.fontWeight]
+      .filter(
+        (value) =>
+          value !== undefined &&
+          value !== null &&
+          `${value}`.trim() !== "",
+      )
+      .map((value) => `${value}`.trim())
+      .join(" ")
+      .trim();
+  const parsedStyle = parseFontStyle(styleDescriptor);
+  const resolvedFontSize =
+    typeof fontSize === "number"
+      ? fontSize
+      : typeof fallback.fontSize === "number"
+        ? fallback.fontSize
+        : null;
+  return {
+    fontStyle: parsedStyle.fontStyle,
+    fontWeight: parsedStyle.fontWeight,
+    fontFamily: resolvedFamily ? `"${resolvedFamily}", sans-serif` : "sans-serif",
+    fontSizeValue:
+      typeof resolvedFontSize === "number" ? `${resolvedFontSize}px` : "16px",
+  };
+}
+
+function parseFontStyle(styleName = "") {
+  if (!styleName) {
+    return { fontStyle: "normal", fontWeight: "400" };
+  }
+  const lower = styleName.toLowerCase();
+  const isItalic = lower.includes("italic");
+  const weightKey = lower.replace("italic", "").replace(/ +/g, " ").trim();
+  const weightMap = {
+    thin: "100",
+    "extra light": "200",
+    ultralight: "200",
+    light: "300",
+    book: "350",
+    normal: "400",
+    regular: "400",
+    roman: "400",
+    medium: "500",
+    "semi bold": "600",
+    "demi bold": "600",
+    bold: "700",
+    "extra bold": "800",
+    black: "900",
+    heavy: "900",
+  };
+  const normalizedKey = weightKey.replace(/-+/g, " ").trim();
+  const directMatch = weightMap[normalizedKey];
+  let fontWeight = directMatch;
+  if (!fontWeight && normalizedKey) {
+    const fuzzyKey = Object.keys(weightMap).find((key) =>
+      normalizedKey.includes(key),
+    );
+    fontWeight =
+      (fuzzyKey && weightMap[fuzzyKey]) ||
+      normalizedKey.match(/\d{3}/)?.[0] ||
+      "400";
+  }
+  if (!fontWeight) {
+    fontWeight = "400";
+  }
+  return {
+    fontStyle: isItalic ? "italic" : "normal",
+    fontWeight,
+  };
+}
+
+function getNamespaceData(extensions) {
+  if (!extensions) return null;
+  for (const namespace of NAMESPACES) {
+    if (extensions[namespace]) {
+      return extensions[namespace];
+    }
+  }
+  return null;
 }

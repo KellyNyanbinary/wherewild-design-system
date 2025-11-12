@@ -19,6 +19,25 @@ function colorToHex({ r, g, b, a }) {
   );
 }
 
+function mergeObjects(source, extra) {
+  const target = {};
+  if (source && typeof source === "object") {
+    for (const key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+  if (extra && typeof extra === "object") {
+    for (const key in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, key)) {
+        target[key] = extra[key];
+      }
+    }
+  }
+  return target;
+}
+
 async function go() {
   const payload = [];
   (await figma.getLocalEffectStylesAsync()).forEach(
@@ -27,13 +46,17 @@ async function go() {
         .filter((a) => a.visible)
         .map((effect) => {
           const variables = {};
-          for (let property in effect.boundVariables) {
+          const boundEffectVariables = effect.boundVariables || {};
+          for (let property in boundEffectVariables) {
             variables[property] = figma.variables.getVariableById(
-              effect.boundVariables[property].id
+              boundEffectVariables[property].id
             ).name;
           }
-          const hex = colorToHex(effect.color);
-          return { ...effect, hex, variables };
+          const hasColor =
+            effect.color && typeof effect.color === "object" ? effect.color : null;
+          const hex = hasColor ? colorToHex(effect.color) : null;
+          const additions = hex ? { hex, variables } : { variables };
+          return mergeObjects(effect, additions);
         });
       payload.push(JSON.stringify({ type, name, effects: newEffects }));
     }
@@ -43,12 +66,13 @@ async function go() {
       .filter((a) => a.visible)
       .map((paint) => {
         const variables = {};
-        for (let property in paint.boundVariables) {
+        const boundPaintVariables = paint.boundVariables || {};
+        for (let property in boundPaintVariables) {
           variables[property] = figma.variables.getVariableById(
-            paint.boundVariables[property].id
+            boundPaintVariables[property].id
           ).name;
         }
-        return { ...paint, variables };
+        return mergeObjects(paint, { variables });
       });
     payload.push(JSON.stringify({ type, name, paints: newPaints }));
   });
