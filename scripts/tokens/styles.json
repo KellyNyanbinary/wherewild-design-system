@@ -1023,7 +1023,7 @@
       }
     },
     "variables": {
-      "fontSize": "Title Page/Size Base",
+      "fontSize": "Title Page/Size Medium",
       "fontFamily": "Title Page/Font Family",
       "fontWeight": "Title Page/Font Weight"
     }
@@ -1065,7 +1065,7 @@
       }
     },
     "variables": {
-      "fontSize": "Subtitle/Size Base",
+      "fontSize": "Subtitle/Size Medium",
       "fontFamily": "Subtitle/Font Family",
       "fontWeight": "Subtitle/Font Weight"
     }
@@ -1107,7 +1107,7 @@
       }
     },
     "variables": {
-      "fontSize": "Heading/Size Base",
+      "fontSize": "Heading/Size Medium",
       "fontFamily": "Heading/Font Family",
       "fontWeight": "Heading/Font Weight"
     }
@@ -1443,7 +1443,7 @@
       }
     },
     "variables": {
-      "fontSize": "Code/Size Base",
+      "fontSize": "Code/Size Medium",
       "fontFamily": "Code/Font Family",
       "fontWeight": "Code/Font Weight"
     }
