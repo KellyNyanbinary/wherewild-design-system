@@ -81,6 +81,12 @@ const COLLECTION_DATA = {
       },
     },
   },
+  responsive: {
+    settings: {
+      prefix: "responsive",
+      convertPixelToRem: true,
+    },
+  },
 };
 
 initialize();
@@ -131,13 +137,16 @@ async function initialize() {
  * @returns {{ processed: {[collection_key: string]: { definitions: { [mode_name: string]: Array<{ property: string, propertyName: string, figmaId: string, description: string, value: string, type: string }> } } } } }}
  */
 function processTokenJSON(data) {
+  ensureCollectionSettingsExist(data);
   const processed = { ...COLLECTION_DATA };
   for (let key in processed) {
-    processCollection(
-      data,
-      COLLECTION_DATA[key],
-      `${KEY_PREFIX_COLLECTION}${key}`,
-    );
+    const definitionsKey = `${KEY_PREFIX_COLLECTION}${key}`;
+    if (!data[definitionsKey]) {
+      delete processed[key];
+      console.warn(`Skipping token collection "${definitionsKey}" - not found in tokens.json`);
+      continue;
+    }
+    processCollection(data, COLLECTION_DATA[key], definitionsKey);
   }
 
   // Our theme.css file string.
@@ -421,7 +430,7 @@ ${Object.keys(processed)
     if (value.toString().charAt(0) === "{")
       return `var(--${value
         .replace(`${definitionsKey}`, prefix)
-        .replace(/[\. ]/g, "-")
+        .replace(/[. ]/g, "-")
         .replace(/^\{/, "")
         .replace(/\}$/, "")})`;
     const valueIsDigits = value.toString().match(/^-?\d+(\.\d+)?$/);
@@ -442,6 +451,27 @@ ${Object.keys(processed)
     }
     return value;
   }
+}
+
+function ensureCollectionSettingsExist(data = {}) {
+  Object.keys(data).forEach((definitionsKey) => {
+    if (!definitionsKey.startsWith(KEY_PREFIX_COLLECTION)) return;
+    const normalizedKey = definitionsKey.slice(KEY_PREFIX_COLLECTION.length);
+    if (!normalizedKey) return;
+    if (COLLECTION_DATA[normalizedKey]) {
+      return;
+    }
+    const fallbackPrefix = normalizedKey.replace(/_/g, "-");
+    COLLECTION_DATA[normalizedKey] = {
+      settings: {
+        prefix: fallbackPrefix,
+        convertPixelToRem: true,
+      },
+    };
+    console.warn(
+      `Added default token collection settings for "${normalizedKey}". Consider configuring it explicitly if special handling is needed.`,
+    );
+  });
 }
 
 /**
