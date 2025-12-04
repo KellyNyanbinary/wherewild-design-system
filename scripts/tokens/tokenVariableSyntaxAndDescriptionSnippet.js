@@ -135,6 +135,7 @@ Promise.all([
   ["VariableID:228:6769", "var(--wds-size-blur-100)", ""],
   ["VariableID:3300:327", "var(--wds-size-space-8000)", ""],
   ["VariableID:3300:328", "var(--wds-size-space-16000)", ""],
+  ["VariableID:3397:185", "var(--wds-size-space-250)", ""],
   ["VariableID:346:10896", "var(--wds-size-space-4000)", ""],
   ["VariableID:346:10902", "var(--wds-size-space-800)", ""],
   ["VariableID:346:10903", "var(--wds-size-space-1200)", ""],

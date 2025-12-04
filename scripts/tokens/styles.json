@@ -1436,11 +1436,16 @@
       "fontStyle": {
         "type": "VARIABLE_ALIAS",
         "id": "VariableID:66:14846"
+      },
+      "fontFamily": {
+        "type": "VARIABLE_ALIAS",
+        "id": "VariableID:66:10179"
       }
     },
     "variables": {
       "fontSize": "Body/Size Small",
-      "fontStyle": "Body/Font Style Italic"
+      "fontStyle": "Body/Font Style Italic",
+      "fontFamily": "Body/Font Family"
     }
   },
   {
