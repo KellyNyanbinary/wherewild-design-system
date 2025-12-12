@@ -609,7 +609,7 @@
   --wds-responsive-device: mobile;
   --wds-responsive-device-width: 23.4375rem;
   --wds-responsive-margin-horizontal: var(--@size-space-800);
-  --wds-responsive-root-font-size: var(--@typography_primitives-scale-03);
+  --wds-responsive-root-font-size: var(--@typography_primitives-scale-02);
   --wds-responsive-scale: 0.0625rem;
   --wds-responsive-text-width: 50rem;
 }
@@ -619,7 +619,7 @@
   --wds-responsive-device: tablet;
   --wds-responsive-device-width: 48rem;
   --wds-responsive-margin-horizontal: var(--@size-space-1200);
-  --wds-responsive-root-font-size: var(--@typography_primitives-scale-03);
+  --wds-responsive-root-font-size: var(--@typography_primitives-scale-02);
   --wds-responsive-scale: 0.0625rem;
   --wds-responsive-text-width: 50rem;
 }
