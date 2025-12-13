@@ -213,6 +213,7 @@ Promise.all([
   ["VariableID:3279:14405", "var(--wds-responsive-content-width)", ""],
   ["VariableID:3279:14406", "var(--wds-responsive-text-width)", ""],
   ["VariableID:3300:326", "var(--wds-responsive-margin-horizontal)", ""],
+  ["VariableID:3439:75", "var(--wds-responsive-max-device-width)", ""],
   ["VariableID:9:11219", "var(--wds-responsive-device-width)", ""],
   ["VariableID:9:11224", "var(--wds-responsive-root-font-size)", ""],
   ["VariableID:280:16481", "var(--wds-color-pink-100)", ""],
